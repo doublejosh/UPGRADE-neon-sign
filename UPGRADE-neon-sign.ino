@@ -133,9 +133,9 @@ void showSpectrum() {
     // Level meter.
     if (mode == 2) {
       // Just listen for bass.
-      if ( (reading > lowMax)) lowMax = reading;
+      //if (reading > lowMax) lowMax = reading;
       // Mark the pixel of the current max value.
-      if ((currentMax != 0) && (currentMax == band)) ledStrip.setPixelColor(band-1, triggerColor);
+      if ((currentMax != 0) && (currentMax == band) && (quietTimer <= QUIET_WINDOW)) ledStrip.setPixelColor(band-1, triggerColor);
       else ledStrip.setPixelColor(band, baseColor);
     }
   }
@@ -146,7 +146,7 @@ void showSpectrum() {
   }
   else quietTimer = 0;
 
-  if (quietTimer == QUIET_WINDOW) {
+  if (quietTimer >= QUIET_WINDOW) {
     if (mode == 1) mode = 2;
     else mode = 1;
   }
