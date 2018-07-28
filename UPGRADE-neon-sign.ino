@@ -6,15 +6,26 @@
  */
 
 #include <Adafruit_NeoPixel.h>
+// #include "FastLED.h"
 
 #define LEDS_BANDS 7     // Number of pixels and spectrum bands.
 #define THREASHOLD 3     // Cuts off low readings.
-#define DIVISOR_FLOOR 64 // Lowest analog reading will be devided by, for sensitivity adjustment
+#define DIVISOR_FLOOR 20 // Lowest analog reading will be devided by, for sensitivity adjustment
 #define ADJUST_WINDOW 10 // How many cycles to delay adjusting sensitivity.
 #define LOOP_DELAY 15    // Milliseconds to wait for each cycle.
 #define QUIET_WINDOW 50  // Cycles to wait to consider sound off (mode switching).
 
-#define LED_PIN 8
+#define BRIGHTEST 100
+
+#define LED_PIN 7
+
+// PWM pins.
+#define LED1_1 3
+#define LED1_2 6
+#define LED1_3 9
+#define LED2_1 10
+#define LED2_2 11
+#define LED2_3 13
 
 // Spectrum analyzer shield pins.
 // You can move pins 4 and 5, but you must cut the
@@ -29,17 +40,27 @@
 Adafruit_NeoPixel ledStrip = Adafruit_NeoPixel(LEDS_BANDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 uint32_t offColor = ledStrip.Color(0, 0, 0);
+unsigned int offColorPwm[] = {0, 0, 0};
 uint32_t baseColor = ledStrip.Color(0, 255, 0);
+unsigned int baseColorPwm[] = {255, 145, 0};
 uint32_t triggerColor = ledStrip.Color(255, 145, 0);
+unsigned int triggerColorPwm[] = {255, 145, 0};
 uint32_t colors[] = {
            ledStrip.Color(0, 255, 0),
            ledStrip.Color(150, 255, 0),
            ledStrip.Color(255, 255, 0),
            ledStrip.Color(255, 0, 0),
-           ledStrip.Color(255, 0, 0),
+           ledStrip.Color(255, 0, 0)
            //ledStrip.Color(255, 0, 255),
            //ledStrip.Color(0, 0, 255)
            //ledStrip.Color(0, 255, 255)
+         };
+unsigned int pwmColors[][3] = {
+           {0, 255, 0},
+           {150, 255, 0},
+           {255, 255, 0},
+           {255, 0, 0},
+           {255, 0, 0}
          };
 
 unsigned int mode = 1;
@@ -59,6 +80,14 @@ void setup() {
   // Setup pins to drive the spectrum analyzer. 
   pinMode(SPECTRUM_RESET, OUTPUT);
   pinMode(SPECTRUM_STROBE, OUTPUT);
+
+  // PWM pin setup.
+  pinMode(LED1_1, OUTPUT);
+  pinMode(LED1_2, OUTPUT);
+  pinMode(LED1_3, OUTPUT);
+  pinMode(LED2_1, OUTPUT);
+  pinMode(LED2_2, OUTPUT);
+  pinMode(LED2_3, OUTPUT);
 
   // Init spectrum analyzer.
   digitalWrite(SPECTRUM_STROBE, LOW);
@@ -116,8 +145,14 @@ void showSpectrum() {
 
     // Spectrum bands.
     if (mode == 1) {
-      if ((reading >= THREASHOLD) && (reading == currentMax)) ledStrip.setPixelColor(band, colors[reading-THREASHOLD]);
-      else ledStrip.setPixelColor(band, offColor);
+      if ((reading >= THREASHOLD) && (reading == currentMax)) {
+        ledStrip.setPixelColor(band, colors[reading-THREASHOLD]);
+        if (band == 1 || band == 2) setPwm(band, pwmColors[reading-THREASHOLD]);
+      }
+      else {
+        ledStrip.setPixelColor(band, offColor);
+        if (band == 1 || band == 2) setPwm(band, offColorPwm);
+      }
     }
 
     Serial.print(reading);
@@ -135,8 +170,18 @@ void showSpectrum() {
       // Just listen for bass.
       //if (reading > lowMax) lowMax = reading;
       // Mark the pixel of the current max value.
-      if ((currentMax != 0) && (currentMax == band) && (quietTimer <= QUIET_WINDOW)) ledStrip.setPixelColor(band-1, triggerColor);
-      else ledStrip.setPixelColor(band, baseColor);
+      if ((currentMax != 0) && (currentMax == band) && (quietTimer <= QUIET_WINDOW)) {
+        ledStrip.setPixelColor(band-1, triggerColor);
+        if (band == 1 || band == 2) setPwm(band, triggerColorPwm);
+      }
+      if (currentMax > band) {
+        ledStrip.setPixelColor(band, triggerColor);
+        if (band == 1 || band == 2) setPwm(band, triggerColorPwm);
+      }
+      else {
+        ledStrip.setPixelColor(band, baseColor);
+        if (band == 1 || band == 2) setPwm(band, baseColorPwm);
+      }
     }
   }
 
@@ -166,6 +211,19 @@ void showSpectrum() {
   else if ((currentMax < 4) && (divisor > DIVISOR_FLOOR) && (adjustTimer++ >= ADJUST_WINDOW)) {
     divisor--;
     adjustTimer = 0;
+  }
+}
+
+void setPwm (unsigned int strand, unsigned int colors[3]) {
+  if (strand == 1) {
+    analogWrite(LED1_1, colors[0]);
+    analogWrite(LED1_2, colors[1]);
+    analogWrite(LED1_3, colors[2]);
+  }
+  if (strand == 2) {
+    analogWrite(LED2_1, colors[0]);
+    analogWrite(LED2_2, colors[1]);
+    analogWrite(LED2_3, colors[2]);
   }
 }
 
